@@ -1,6 +1,9 @@
-# Méditation vocale
+# meditation-vocale
+Application PWA de lecture audio de séance de méditation
 
-Lecteur de méditations guidées, paragraphe par paragraphe, installable sur le téléphone (PWA).
+Lecteur de méditations guidées, paragraphe par paragraphe, installable sur le téléphone.
+
+Adresse : https://jeepalexander.github.io/meditation-vocale/
 
 - Bibliothèque de textes enregistrée sur l'appareil
 - Ajout d'un texte par photo (transcription Tesseract, sur l'appareil, hors ligne)
