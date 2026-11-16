@@ -19,11 +19,7 @@ Prenez le temps qu'il vous faut, reprenez-vous-y à plusieurs fois si vous en av
 Dès que vous commencez à douter, videz-vous la tête. Si vous avez du mal à vous vider la tête, stoppez et reprenez plus tard. Tout ce que vous réaliserez sera exactement ce que vous devez faire. Ne vous jugez pas trop sévèrement et si vous attendez beaucoup de vous, libérez à fond vos inspirations et laissez-vous créer !`;
 
 const BUILTIN = { id:'builtin-en-pratique', title:'En pratique — ouvrir des portails', text: BUILTIN_TEXT, builtin:true, created:0 };
-const NEURAL = [
-  {id:'kokoro',  label:'Kokoro — féminine, naturelle'},
-  {id:'siwis',   label:'Siwis — féminine, douce'},
-  {id:'pierre',  label:'Pierre — masculine, posée'}
-];
+const NEURAL = [];   // plus de voix intégrées : l'audio de qualité est importé depuis le Mac
 
 const $ = id => document.getElementById(id);
 const synth = window.speechSynthesis || null;
@@ -105,7 +101,7 @@ function renderLibrary(){
     el.innerHTML = `<div class="spine"></div><div class="info"><p class="t"></p><div class="m"></div><div class="ex"></div></div>`;
     el.querySelector('.t').textContent = t.title || 'Sans titre';
     const tags = [];
-    if (t.builtin) tags.push('★ voix haute qualité');
+    if (t.builtin && NEURAL.length) tags.push('★ voix haute qualité');
     if (t.audio) tags.push('🎧 audio importé');
     el.querySelector('.m').textContent = `${ps.length} paragraphe${ps.length>1?'s':''}` + (tags.length ? ' · ' + tags.join(' · ') : '');
     el.querySelector('.ex').textContent = ps.find(p => p.length > 30) || ps[0] || '';
@@ -224,7 +220,7 @@ function loadVoices(){
     o.textContent = '🎧 ' + (current.audio.name || 'Audio importé') + (importValid() ? '' : ' (texte modifié depuis)');
     o.disabled = !importValid(); g0.appendChild(o); sel.appendChild(g0);
   }
-  if (current && current.builtin){
+  if (current && current.builtin && NEURAL.length){
     const g1 = document.createElement('optgroup'); g1.label = '★ Voix haute qualité';
     NEURAL.forEach(n => { const o = document.createElement('option'); o.value = 'neural:'+n.id; o.textContent = '★ ' + n.label; g1.appendChild(o); });
     sel.appendChild(g1);
@@ -238,7 +234,6 @@ function loadVoices(){
   const bestDevice = list.find(isNice) || list[0];
   let wanted;
   if (current && importValid()) wanted = (store.voiceByText || {})[current.id] || 'import';
-  else if (current && current.builtin) wanted = store.voiceBuiltin || 'neural:kokoro';
   else wanted = store.voiceOther || (bestDevice ? bestDevice.voiceURI : '');
   sel.value = usable.includes(wanted) ? wanted : (usable.includes(prev) ? prev : (usable[0] || ''));
 }
