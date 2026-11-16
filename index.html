@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Méditation vocale</title>
+<meta name="theme-color" content="#8b6f4e">
+<meta name="description" content="Lecteur de méditations guidées, paragraphe par paragraphe.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Méditation">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<style>
+  :root{
+    --bg:#f6f1ea; --card:#fffdf9; --ink:#3b3530; --muted:#8a7f74;
+    --accent:#8b6f4e; --accent-soft:#efe4d6; --line:#e6dccf; --danger:#a0523d;
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif;
+  }
+  body.dark{
+    --bg:#1d1b19; --card:#26231f; --ink:#ece4d8; --muted:#a39a8e;
+    --accent:#d2b48c; --accent-soft:#3a332b; --line:#3a352f; --danger:#d98b74;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;min-height:100%}
+  body{
+    background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif; font-size:15px;
+    padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    transition:background .4s,color .4s;
+  }
+  .wrap{max-width:720px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column;padding:18px 18px 28px}
+  header{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  h1{font-family:var(--serif);font-weight:500;font-size:1.6rem;margin:0;line-height:1.15}
+  .icon-btn{background:none;border:1px solid var(--line);color:var(--ink);border-radius:999px;padding:8px 13px;font:inherit;font-size:.85rem;cursor:pointer;white-space:nowrap}
+  .icon-btn:disabled{opacity:.45;cursor:default}
+  .primary{background:var(--accent);color:var(--card);border-color:var(--accent)}
+  .hidden{display:none!important}
+
+  .lib-intro{color:var(--muted);margin:10px 0 18px;font-size:.9rem}
+  .add-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px}
+  .add-card{background:var(--card);border:1px dashed var(--accent);border-radius:16px;padding:16px 12px;color:var(--ink);font:inherit;cursor:pointer;text-align:center;display:flex;flex-direction:column;gap:4px;align-items:center}
+  .add-card .big{font-size:1.6rem}
+  .add-card small{color:var(--muted)}
+  .books{display:grid;gap:10px}
+  .book{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px 16px;display:flex;gap:12px;align-items:center;cursor:pointer}
+  .book .spine{width:6px;align-self:stretch;border-radius:4px;background:var(--accent);opacity:.7}
+  .book .info{flex:1;min-width:0}
+  .book .t{font-family:var(--serif);font-size:1.2rem;font-weight:500;margin:0 0 2px}
+  .book .m{color:var(--muted);font-size:.8rem}
+  .book .ex{color:var(--muted);font-size:.85rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:4px}
+  .book .del{background:none;border:none;color:var(--muted);font-size:1.1rem;cursor:pointer;padding:6px}
+  .foot{color:var(--muted);font-size:.78rem;margin-top:18px;text-align:center;display:grid;gap:8px;justify-items:center}
+  .foot button{background:none;border:none;color:var(--muted);text-decoration:underline;font:inherit;cursor:pointer}
+
+  .progress{margin:16px 0 8px;display:flex;align-items:center;gap:10px;color:var(--muted);font-size:.85rem}
+  .bar{flex:1;height:4px;background:var(--line);border-radius:4px;overflow:hidden}
+  .bar>div{height:100%;background:var(--accent);width:0;transition:width .5s}
+  .stage{flex:1;display:flex;align-items:center;justify-content:center;background:var(--card);border:1px solid var(--line);border-radius:22px;padding:34px 24px;margin:6px 0 18px;min-height:44vh;cursor:pointer}
+  #para{font-family:var(--serif);font-size:clamp(1.35rem,4.6vw,1.95rem);line-height:1.5;text-align:center;margin:0;transition:opacity .45s}
+  #para.fade{opacity:0}
+  #para .s{transition:color .3s}
+  #para .s.on{color:var(--accent)}
+  .status{text-align:center;color:var(--muted);font-size:.85rem;min-height:1.3em;margin-bottom:12px}
+  .controls{display:flex;justify-content:center;align-items:center;gap:12px}
+  .ctrl{width:54px;height:54px;border-radius:50%;border:1px solid var(--line);background:var(--card);color:var(--ink);font-size:1.2rem;cursor:pointer;display:flex;align-items:center;justify-content:center}
+  .ctrl:disabled{opacity:.35;cursor:default}
+  .ctrl.main{width:74px;height:74px;background:var(--accent);color:var(--card);border:none;font-size:1.55rem}
+  .settings{margin-top:22px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px 18px;display:grid;gap:14px}
+  .row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .row label{min-width:150px;color:var(--muted);font-size:.88rem}
+  .row input[type=range]{flex:1;accent-color:var(--accent)}
+  .row output{min-width:46px;text-align:right;font-variant-numeric:tabular-nums}
+  select,input[type=text]{flex:1;min-width:0;padding:9px 10px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:inherit}
+  .switch{accent-color:var(--accent);width:18px;height:18px}
+  details summary{cursor:pointer;color:var(--muted);font-size:.9rem;list-style:none}
+  details summary::before{content:"⚙︎  "}
+  .audio-box{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:center;margin-top:16px}
+  .audio-box small{color:var(--muted);width:100%;text-align:center}
+  .list{margin-top:14px;display:grid;gap:6px}
+  .list button{text-align:left;background:none;border:1px solid transparent;border-radius:10px;padding:8px 10px;color:var(--muted);font:inherit;font-size:.85rem;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .list button.cur{border-color:var(--line);color:var(--ink);background:var(--card)}
+
+  .modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;padding:10px;z-index:10}
+  .modal.open{display:flex}
+  .sheet{background:var(--card);color:var(--ink);border-radius:18px;width:100%;max-width:680px;max-height:94vh;overflow:auto;display:flex;flex-direction:column;padding:18px;gap:12px}
+  .sheet h2{margin:0;font-family:var(--serif);font-weight:500;font-size:1.4rem}
+  .sheet p{margin:0;color:var(--muted);font-size:.85rem}
+  textarea{min-height:34vh;width:100%;border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--bg);color:var(--ink);font:inherit;line-height:1.5;resize:vertical}
+  .actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+  .photo-btns{display:flex;gap:8px;flex-wrap:wrap}
+  .note{background:var(--accent-soft);border-radius:10px;padding:10px 12px;font-size:.85rem;color:var(--ink)}
+  .pages{display:grid;gap:12px}
+  .page{border:1px solid var(--line);border-radius:12px;padding:8px;display:grid;gap:6px}
+  .page .bar2{display:flex;justify-content:space-between;align-items:center;gap:6px;font-size:.8rem;color:var(--muted)}
+  .cropwrap{position:relative;touch-action:none;user-select:none;-webkit-user-select:none;line-height:0}
+  .cropwrap canvas{width:100%;height:auto;border-radius:8px;display:block}
+  .cropbox{position:absolute;border:2px solid var(--accent);background:rgba(139,111,78,.12);box-shadow:0 0 0 9999px rgba(0,0,0,.35);border-radius:4px;pointer-events:none}
+  .tips{font-size:.8rem;color:var(--muted);margin:0;padding-left:18px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <section id="libView">
+    <header>
+      <h1>Ma bibliothèque<br><span style="font-size:1rem;color:var(--muted);font-family:inherit">Textes de méditation</span></h1>
+      <button class="icon-btn themeBtn" title="Mode sombre">☾</button>
+    </header>
+    <p class="lib-intro">Choisis un texte pour l'écouter, ou ajoutes-en un en photographiant une page.</p>
+    <div class="add-row">
+      <button class="add-card" id="addPhotoCard"><span class="big">📷</span><b>Depuis une photo</b><small>Page de livre, document…</small></button>
+      <button class="add-card" id="addTextCard"><span class="big">✎</span><b>Coller un texte</b><small>Saisie libre</small></button>
+    </div>
+    <div class="books" id="books"></div>
+    <div class="foot">
+      <span id="storeNote">Tes textes sont enregistrés sur cet appareil.</span>
+      <span><button id="exportBtn">Sauvegarder mes textes</button> · <button id="importBtn">Restaurer une sauvegarde</button></span>
+      <input type="file" id="importInput" accept="application/json,.json" class="hidden">
+      <span id="installNote" class="hidden"></span>
+    </div>
+  </section>
+
+  <section id="readerView" class="hidden" style="display:flex;flex-direction:column;flex:1">
+    <header>
+      <button class="icon-btn" id="backBtn">← Bibliothèque</button>
+      <div style="display:flex;gap:6px">
+        <button class="icon-btn themeBtn" title="Mode sombre">☾</button>
+        <button class="icon-btn" id="editBtn">Modifier</button>
+      </div>
+    </header>
+    <h1 id="readerTitle" style="margin-top:14px"></h1>
+    <div class="progress"><span id="count">1 / 1</span><div class="bar"><div id="barFill"></div></div></div>
+    <div class="stage" id="stage"><p id="para"></p></div>
+    <div class="status" id="status">Appuie sur ▶ pour commencer la lecture.</div>
+    <div class="controls">
+      <button class="ctrl" id="prevBtn" title="Paragraphe précédent">⏮</button>
+      <button class="ctrl" id="stopBtn" title="Arrêter">■</button>
+      <button class="ctrl main" id="playBtn" title="Lecture / pause">▶</button>
+      <button class="ctrl" id="replayBtn" title="Relire ce paragraphe">↺</button>
+      <button class="ctrl" id="nextBtn" title="Paragraphe suivant">⏭</button>
+    </div>
+
+    <details class="settings">
+      <summary>Réglages de la voix</summary>
+      <div class="row"><label for="voice">Voix</label><select id="voice"></select></div>
+      <div class="row"><label for="rate">Vitesse</label><input type="range" id="rate" min="0.5" max="1.3" step="0.05" value="0.85"><output id="rateOut"></output></div>
+      <div class="row"><label for="pitch">Hauteur (voix appareil)</label><input type="range" id="pitch" min="0.6" max="1.4" step="0.05" value="0.95"><output id="pitchOut"></output></div>
+      <div class="row"><label for="sentGap">Silence entre les phrases</label><input type="range" id="sentGap" min="0" max="6" step="0.5" value="1.5"><output id="sentGapOut"></output></div>
+      <div class="row"><label for="auto">Enchaîner les paragraphes</label><input type="checkbox" class="switch" id="auto" checked></div>
+      <div class="row"><label for="gap">Silence entre paragraphes</label><input type="range" id="gap" min="0" max="30" step="1" value="6"><output id="gapOut"></output></div>
+    </details>
+
+    <div class="audio-box">
+      <button class="icon-btn" id="audioBtn">🎧 Ajouter l'audio</button>
+      <button class="icon-btn hidden" id="audioDelBtn">Retirer l'audio</button>
+      <input type="file" id="audioInput" accept="audio/*,.mp3,.wav,.m4a,.ogg,.flac" class="hidden">
+      <small id="audioNote">Importe un fichier audio de tout le texte (ZONOS3…) : il sera découpé phrase par phrase.</small>
+    </div>
+
+    <div class="list" id="list"></div>
+  </section>
+</div>
+
+<div class="modal" id="editModal">
+  <div class="sheet">
+    <h2 id="editHeading">Nouveau texte</h2>
+    <div id="photoZone" class="hidden" style="display:grid;gap:10px">
+      <p>Photographie la ou les pages, dans l'ordre de lecture. La transcription se fait sur ton téléphone, sans internet.</p>
+      <ul class="tips">
+        <li>Page bien à plat, photo prise bien en face.</li>
+        <li>Bonne lumière, sans ombre de la main ni du téléphone.</li>
+        <li>Ensuite, trace un cadre au doigt autour du texte à garder.</li>
+      </ul>
+      <div class="photo-btns">
+        <button class="icon-btn" id="camBtn">📷 Prendre une photo</button>
+        <button class="icon-btn" id="galBtn">🖼 Choisir dans la galerie</button>
+      </div>
+      <input type="file" id="camInput" accept="image/*" capture="environment" class="hidden">
+      <input type="file" id="galInput" accept="image/*" multiple class="hidden">
+      <div class="pages" id="pages"></div>
+      <div class="actions" style="justify-content:flex-start"><button class="icon-btn primary" id="ocrBtn" disabled>Transcrire le texte</button></div>
+      <div class="note hidden" id="ocrNote"></div>
+    </div>
+    <div class="row" style="gap:8px"><label for="titleInput" style="min-width:auto">Titre</label><input type="text" id="titleInput" placeholder="Titre du texte"></div>
+    <p>Sépare les paragraphes par une ligne vide : chacun sera lu l'un après l'autre.</p>
+    <textarea id="editor" placeholder="Le texte apparaîtra ici…"></textarea>
+    <div class="actions">
+      <button class="icon-btn" id="cancelBtn">Annuler</button>
+      <button class="icon-btn primary" id="saveBtn">Enregistrer dans la bibliothèque</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="confirmModal">
+  <div class="sheet" style="max-width:420px">
+    <p id="confirmText" style="font-size:.95rem;color:var(--ink)"></p>
+    <div class="actions">
+      <button class="icon-btn" id="confirmNo">Annuler</button>
+      <button class="icon-btn primary" id="confirmYes" style="background:var(--danger);border-color:var(--danger)">Supprimer</button>
+    </div>
+  </div>
+</div>
+
+<script src="vendor/tesseract/tesseract.min.js" defer></script>
+<script src="ocr.js" defer></script>
+<script src="app.js" defer></script>
+</body>
+</html>
