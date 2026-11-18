@@ -486,6 +486,136 @@ $('audioDelBtn').onclick = () => askConfirm("Retirer l'audio importé de ce text
   await saveText(t); await openReader(t.id);
 });
 
+/* ---------- Voix Marie (Mistral, Voxtral TTS d'origine) ---------- */
+const MISTRAL_MODEL = 'voxtral-mini-tts-2603';
+const MISTRAL_URL = 'https://api.mistral.ai/v1/audio/speech';
+const MISTRAL_VOICES = [
+  ['fr_marie_curious', 'Marie — curieuse'], ['fr_marie_neutral', 'Marie — neutre'], ['fr_marie_sad', 'Marie — douce (triste)'],
+  ['fr_marie_happy', 'Marie — joyeuse'], ['fr_marie_excited', 'Marie — enthousiaste']
+];
+const MKEY = 'mv-mistral-v1';
+let mistral = {};
+try { mistral = JSON.parse(localStorage.getItem(MKEY) || '{}'); } catch(e) {}
+function saveMistral(){ try { localStorage.setItem(MKEY, JSON.stringify(mistral)); } catch(e) {} }
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+function fillMistralForm(){
+  const sel = $('mVoice'); sel.innerHTML = '';
+  MISTRAL_VOICES.forEach(([id, label]) => { const o = document.createElement('option'); o.value = id; o.textContent = label; sel.appendChild(o); });
+  sel.value = mistral.voice || 'fr_marie_curious';
+  $('mKey').value = mistral.key || '';
+  $('mProxy').value = mistral.proxy || '';
+  $('mNote').classList.add('hidden');
+}
+$('mistralBtn').onclick = () => { stopAll(true); fillMistralForm(); $('mistralModal').classList.add('open'); };
+$('mCancel').onclick = () => $('mistralModal').classList.remove('open');
+$('mGo').onclick = async () => {
+  mistral.key = $('mKey').value.trim();
+  mistral.proxy = $('mProxy').value.trim().replace(/\/+$/, '');
+  mistral.voice = $('mVoice').value;
+  saveMistral();
+  if (!mistral.key){ showMNote('Colle d\'abord ta clé Mistral.'); return; }
+  if (mistral.proxy && !/^https:\/\//.test(mistral.proxy)){ showMNote('L\'adresse du relais doit commencer par https://'); return; }
+  $('mistralModal').classList.remove('open');
+  await generateMistral();
+};
+function showMNote(t){ const n = $('mNote'); n.textContent = t; n.classList.remove('hidden'); }
+
+class MistralError extends Error { constructor(code, msg){ super(msg); this.code = code; } }
+
+async function mistralSpeech(text){
+  const body = JSON.stringify({ model: MISTRAL_MODEL, input: text, voice_id: mistral.voice || 'fr_marie_curious', response_format: 'mp3' });
+  const headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + mistral.key };
+  const urls = mistral.proxy ? [mistral.proxy] : [MISTRAL_URL];
+  for (let attempt = 0; attempt < 5; attempt++){
+    let res;
+    try { res = await fetch(urls[0], { method: 'POST', headers, body }); }
+    catch(e){ throw new MistralError(mistral.proxy ? 'proxy' : 'cors', e.message); }
+    if (res.status === 429){ await sleep(2500 * (attempt + 1)); continue; }
+    if (!res.ok){
+      const detail = (await res.text().catch(() => '')).slice(0, 300);
+      throw new MistralError(res.status === 401 ? 'key' : (res.status === 402 ? 'billing' : 'http'), `${res.status} ${detail}`);
+    }
+    const data = await res.json();
+    if (!data.audio_data) throw new MistralError('http', 'réponse sans audio');
+    const bin = atob(data.audio_data);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return bytes.buffer;
+  }
+  throw new MistralError('rate', 'trop de demandes');
+}
+
+function decodeAudio(ac, ab){
+  return new Promise((res, rej) => { const p = ac.decodeAudioData(ab, res, rej); if (p && p.then) p.then(res, rej); });
+}
+function toMono(buf){
+  const out = new Float32Array(buf.length);
+  for (let c = 0; c < buf.numberOfChannels; c++){ const d = buf.getChannelData(c); for (let i = 0; i < d.length; i++) out[i] += d[i] / buf.numberOfChannels; }
+  return out;
+}
+function encodeWav(samples, sr){
+  const buf = new ArrayBuffer(44 + samples.length * 2), v = new DataView(buf);
+  const w = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+  w(0, 'RIFF'); v.setUint32(4, 36 + samples.length * 2, true); w(8, 'WAVE'); w(12, 'fmt ');
+  v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, sr, true);
+  v.setUint32(28, sr * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, 'data'); v.setUint32(40, samples.length * 2, true);
+  for (let i = 0, o = 44; i < samples.length; i++, o += 2){ const s = Math.max(-1, Math.min(1, samples[i])); v.setInt16(o, s < 0 ? s * 0x8000 : s * 0x7fff, true); }
+  return new Blob([buf], { type: 'audio/wav' });
+}
+
+async function generateMistral(){
+  if (!current) return;
+  const note = $('audioNote');
+  const ps = parse(current.text);
+  if (!navigator.onLine){ note.textContent = 'Il faut une connexion internet pour générer la voix.'; return; }
+  const btns = [$('mistralBtn'), $('audioBtn')]; btns.forEach(b => b.disabled = true);
+  const AC = window.AudioContext || window.webkitAudioContext;
+  let ac; try { ac = new AC({ sampleRate: 24000 }); } catch(e) { ac = new AC(); }
+  try {
+    const parts = [], segs = []; let total = 0, n = 0;
+    const sr = ac.sampleRate, pause = Math.round(sr * 1.0);
+    for (let i = 0; i < ps.length; i++){
+      note.textContent = `✦ Voix Marie : paragraphe ${i+1} sur ${ps.length}…`;
+      const buf = await decodeAudio(ac, await mistralSpeech(ps[i]));
+      const lens = sentences(ps[i]).map(s => s.length);
+      const local = segmentAudio(buf, lens, new Set([lens.length - 1]));
+      const offset = total / sr;
+      local.forEach(([a, b]) => segs.push([+(a + offset).toFixed(3), +(b + offset).toFixed(3)]));
+      n += lens.length;
+      const mono = toMono(buf);
+      parts.push(mono); total += mono.length;
+      if (i < ps.length - 1){ parts.push(new Float32Array(pause)); total += pause; }
+      if (!mistral.proxy) await sleep(300);
+    }
+    const all = new Float32Array(total); let o = 0;
+    for (const p of parts){ all.set(p, o); o += p.length; }
+    const blob = encodeWav(all, sr);
+    let t = current;
+    if (t.builtin) t = { id:newId(), title:t.title, text:t.text, created:Date.now() };
+    const label = (MISTRAL_VOICES.find(v => v[0] === mistral.voice) || [0, 'Marie'])[1];
+    const rec = { id:t.id, blob, segments:segs, name:label, n };
+    await DB.put('audio', rec);
+    t = { ...t, audio:{ name:rec.name, n } };
+    await saveText(t);
+    store.voiceByText = store.voiceByText || {}; store.voiceByText[t.id] = 'import'; persist();
+    await openReader(t.id);
+    setStatus(`Voix ${label} prête (${n} phrases). Appuie sur ▶ pour écouter.`);
+  } catch(e){
+    const c = e && e.code;
+    note.textContent =
+      c === 'cors' ? "Mistral refuse les demandes venant directement d'une page web. Il faut configurer le relais (voir l'aide dans ✦ Voix Marie)." :
+      c === 'proxy' ? "Le relais ne répond pas. Vérifie son adresse dans ✦ Voix Marie." :
+      c === 'key' ? "Clé Mistral refusée. Vérifie-la dans ✦ Voix Marie." :
+      c === 'billing' ? "Mistral demande d'activer la facturation pour cette voix (console.mistral.ai)." :
+      c === 'rate' ? "Trop de demandes d'un coup. Réessaie dans une minute." :
+      "La génération a échoué : " + (e && e.message ? e.message : 'erreur inconnue');
+  } finally {
+    try { ac.close(); } catch(e) {}
+    btns.forEach(b => b.disabled = false);
+  }
+}
+
 /* ---------- Confirmation ---------- */
 let confirmCb = null;
 function askConfirm(text, cb){ $('confirmText').textContent = text; confirmCb = cb; $('confirmModal').classList.add('open'); }

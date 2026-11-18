@@ -1,6 +1,6 @@
 /* Service worker propre à « Méditation vocale » : son cache porte un nom unique,
    et sa portée se limite au dossier de l'application. */
-const CACHE = 'meditation-vocale-v2';
+const CACHE = 'meditation-vocale-v3';
 const FILES = [
   './',
   'index.html',

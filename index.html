@@ -154,6 +154,7 @@
     </details>
 
     <div class="audio-box">
+      <button class="icon-btn primary" id="mistralBtn">✦ Voix Marie</button>
       <button class="icon-btn" id="audioBtn">🎧 Ajouter l'audio</button>
       <button class="icon-btn hidden" id="audioDelBtn">Retirer l'audio</button>
       <input type="file" id="audioInput" accept="audio/*,.mp3,.wav,.m4a,.ogg,.flac" class="hidden">
@@ -190,6 +191,22 @@
     <div class="actions">
       <button class="icon-btn" id="cancelBtn">Annuler</button>
       <button class="icon-btn primary" id="saveBtn">Enregistrer dans la bibliothèque</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="mistralModal">
+  <div class="sheet">
+    <h2>✦ Voix Marie (Mistral)</h2>
+    <p>Le téléphone demande à Mistral la lecture du texte affiché, puis l'enregistre dans l'application pour l'écouter même hors ligne. Coût indicatif : environ 2 centimes pour une page.</p>
+    <div class="row"><label for="mVoice">Voix</label><select id="mVoice"></select></div>
+    <div class="row"><label for="mKey">Clé d'API Mistral</label><input type="password" id="mKey" autocomplete="off" placeholder="Colle ta clé ici"></div>
+    <div class="row"><label for="mProxy">Adresse du relais</label><input type="text" id="mProxy" inputmode="url" autocomplete="off" placeholder="https://…workers.dev (facultatif)"></div>
+    <p>La clé reste enregistrée sur ce téléphone uniquement. Crée-la sur console.mistral.ai, rubrique « API Keys ».</p>
+    <div class="note hidden" id="mNote"></div>
+    <div class="actions">
+      <button class="icon-btn" id="mCancel">Annuler</button>
+      <button class="icon-btn primary" id="mGo">Générer la voix</button>
     </div>
   </div>
 </div>
